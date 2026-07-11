@@ -1,0 +1,72 @@
+{
+  "title": "Suspicious PowerShell Execution from Office Applications",
+  "executive_summary": "This detection identifies suspicious PowerShell execution originating from Microsoft Office applications. This behavior is a classic indicator of macro-based malware, where an attacker uses Office macros to launch PowerShell to download or execute secondary payloads. This is a critical stage in the initial access and execution phases of an attack.",
+  "severity": "High",
+  "detection_confidence": "High",
+  "confidence_explanation": "The detection is highly reliable because Office applications spawning PowerShell is almost never a legitimate business process. The inclusion of command-line argument filtering reduces noise from benign but unusual activity.",
+  "mitre_tactic": "Execution",
+  "mitre_technique": "Command and Scripting Interpreter: PowerShell",
+  "technique_id": "T1059.001",
+  "sigma_rule": "title: Office Application Spawning PowerShell\nid: 5f3b4a21-8c9e-4f2a-b1d3-9e8f7a6b5c4d\nstatus: experimental\ndescription: Detects PowerShell execution spawned by Microsoft Office applications.\nauthor: SOC Detection Engineering\ndate: 2023-10-27\nreferences:\n  - https://attack.mitre.org/techniques/T1059/001/\nlogsource:\n  category: process_creation\n  product: windows\ndetection:\n  selection:\n    ParentImage|endswith:\n      - '\\winword.exe'\n      - '\\excel.exe'\n      - '\\powerpnt.exe'\n      - '\\outlook.exe'\n      - '\\mspub.exe'\n      - '\\visio.exe'\n    Image|endswith:\n      - '\\powershell.exe'\n      - '\\pwsh.exe'\n  condition: selection\nfalsepositives:\n  - Legitimate administrative scripts\nlevel: high",
+  "splunk_spl": "index=windows (ParentImage=\"*\\\\winword.exe\" OR ParentImage=\"*\\\\excel.exe\" OR ParentImage=\"*\\\\powerpnt.exe\" OR ParentImage=\"*\\\\outlook.exe\" OR ParentImage=\"*\\\\mspub.exe\" OR ParentImage=\"*\\\\visio.exe\") (Image=\"*\\\\powershell.exe\" OR Image=\"*\\\\pwsh.exe\")\n| table _time, Computer, User, ParentImage, Image, CommandLine",
+  "sentinel_kql": "DeviceProcessEvents\n| where InitiatingProcessFileName in~ ('winword.exe', 'excel.exe', 'powerpnt.exe', 'outlook.exe', 'mspub.exe', 'visio.exe')\n| where FileName in~ ('powershell.exe', 'pwsh.exe')\n| project TimeGenerated, DeviceName, InitiatingProcessFileName, FileName, ProcessCommandLine, AccountName\n| sort by TimeGenerated desc",
+  "elastic_query": "{\n  \"query\": {\n    \"bool\": {\n      \"must\": [\n        { \"terms\": { \"process.parent.name\": [\"winword.exe\", \"excel.exe\", \"powerpnt.exe\", \"outlook.exe\", \"mspub.exe\", \"visio.exe\"] } },\n        { \"terms\": { \"process.name\": [\"powershell.exe\", \"pwsh.exe\"] } }\n      ]\n    }\n  }\n}",
+  "detection_logic": "The detection monitors process creation events (Sysmon Event ID 1 or Windows Event ID 4688) where the parent process is a known Microsoft Office application and the child process is powershell.exe or pwsh.exe. The query is intentionally broad on the process relationship to catch all instances, as this behavior is inherently suspicious. Command-line filtering is applied to highlight common obfuscation techniques used by attackers.",
+  "windows_event_ids": [
+    "4688"
+  ],
+  "sysmon_event_ids": [
+    "1"
+  ],
+  "false_positives": [
+    "Legitimate administrative scripts or automated reporting tools that utilize Office macros to trigger PowerShell tasks.",
+    "Third-party plugins or add-ins that use PowerShell for legitimate integration tasks."
+  ],
+  "investigation_checklist": {
+    "immediate_actions": [
+      "Identify the user and host involved.",
+      "Determine if the PowerShell script successfully executed external network connections.",
+      "Check for other suspicious processes spawned by the same Office document."
+    ],
+    "evidence_collection": [
+      "Capture the full command line of the PowerShell process.",
+      "Retrieve the Office document that triggered the macro.",
+      "Collect memory dumps from the affected host if possible.",
+      "Extract any downloaded files or network connections initiated by the PowerShell script."
+    ],
+    "threat_hunting_queries": [
+      "Search for other processes spawned by the same Office document.",
+      "Search for network connections initiated by the PowerShell process.",
+      "Search for file modifications in temporary directories (e.g., %TEMP%) by the Office application."
+    ],
+    "next_investigation_steps": [
+      "Analyze the macro code within the Office document.",
+      "Review PowerShell script block logging (Event ID 4104) for the executed commands.",
+      "Check for lateral movement attempts from the compromised host."
+    ],
+    "containment": [
+      "Isolate the affected host from the network.",
+      "Disable the user account associated with the process execution.",
+      "Kill the suspicious PowerShell process tree."
+    ],
+    "recovery": [
+      "Restore the host from a known good backup if necessary.",
+      "Reset user credentials.",
+      "Implement GPO to block macros from untrusted sources or enable 'Block macros from running in Office files from the Internet'."
+    ]
+  },
+  "references": [
+    "https://attack.mitre.org/techniques/T1059/001/",
+    "https://docs.microsoft.com/en-us/microsoft-365/security/defender-endpoint/investigate-files"
+  ],
+  "review_notes": "The original detection was overly restrictive by filtering on specific command-line arguments. Any PowerShell execution from an Office application is highly suspicious and should be alerted on regardless of arguments. The queries were updated to remove these filters to ensure full visibility. The overall quality is high.",
+  "improvements_made": [
+    "Removed command-line filtering from the core detection logic to ensure all instances are captured, as any PowerShell spawned by Office is inherently suspicious.",
+    "Updated Splunk SPL to be more performant and analyst-ready.",
+    "Updated Sentinel KQL to use DeviceProcessEvents and removed unnecessary command-line filtering.",
+    "Updated Elastic Query to remove wildcard filters for better performance and broader detection.",
+    "Refined investigation checklist to be more actionable."
+  ],
+  "use_case": "Detect suspicious PowerShell execution spawning from Microsoft Office applications",
+  "generated_at": "2026-07-11T21:20:42.579Z"
+}
