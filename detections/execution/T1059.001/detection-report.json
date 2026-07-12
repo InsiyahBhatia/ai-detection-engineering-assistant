@@ -1,0 +1,159 @@
+{
+  "title": "Suspicious PowerShell Execution from Office Applications",
+  "executive_summary": "This detection identifies suspicious PowerShell execution originating from Microsoft Office applications. This behavior is a primary indicator of malicious macro execution, often used to download and execute secondary payloads, establish persistence, or perform reconnaissance. Immediate investigation is recommended as this is a high-confidence indicator of compromise.",
+  "severity": "High",
+  "severity_normalized": "high",
+  "detection_confidence": "High",
+  "confidence_explanation": "Spawning PowerShell from Office applications (Word, Excel, PowerPoint) is a classic indicator of macro-based malware delivery. While some legitimate administrative scripts may exist, they are extremely rare in modern enterprise environments and typically warrant immediate investigation.",
+  "detection_version": "1.1.0",
+  "change_log": [
+    "Initial version",
+    "Updated Elastic query to use keyword fields for exact matching and added pwsh.exe support.",
+    "Updated detection logic description to match actual implementation."
+  ],
+  "author": "AI Detection Engineering Assistant",
+  "reviewed_by": "Detection QA Reviewer",
+  "status": "Production Ready",
+  "detection_uuid": "32a34030-25d7-43fe-b031-9be1265d9956",
+  "created_at": "2026-07-12T05:34:06.212Z",
+  "updated_at": "2026-07-12T05:34:06.212Z",
+  "generated_at": "2026-07-12T05:34:06.212Z",
+  "mitre_tactic": "Execution",
+  "mitre_technique": "Command and Scripting Interpreter: PowerShell",
+  "technique_id": "T1059.001",
+  "mitre_folder": "T1059.001",
+  "tactic_folder": "execution",
+  "folder_path": "detections/execution/T1059.001",
+  "github_folder_url": "https://github.com/InsiyahBhatia/ai-detection-engineering-assistant/tree/main/detections/execution/T1059.001",
+  "markdown_url": "https://github.com/InsiyahBhatia/ai-detection-engineering-assistant/blob/main/detections/execution/T1059.001/detection-report.md",
+  "json_url": "https://github.com/InsiyahBhatia/ai-detection-engineering-assistant/blob/main/detections/execution/T1059.001/detection-report.json",
+  "repo_url": "https://github.com/InsiyahBhatia/ai-detection-engineering-assistant",
+  "commit_message_md": "feat(T1059.001): Add Suspicious PowerShell Execution from Office Applications detection\n\nVersion: 1.1.0\nSeverity: High\nConfidence: High\nQA: PASS (90)",
+  "commit_message_json": "chore(T1059.001): Add Suspicious PowerShell Execution from Office Applications detection JSON\n\nVersion: 1.1.0\nSeverity: High\nQA: PASS (90)",
+  "sigma_rule": "title: PowerShell Spawning from Office Application\nid: 5f8a9c2b-1234-4567-8901-abcdef123456\nstatus: experimental\ndescription: Detects PowerShell spawned by Microsoft Office applications.\nauthor: Detection Engineering Team\ndate: 2023-10-27\nlogsource:\n  category: process_creation\n  product: windows\ndetection:\n  selection:\n    ParentImage|endswith:\n      - '\\winword.exe'\n      - '\\excel.exe'\n      - '\\powerpnt.exe'\n      - '\\outlook.exe'\n      - '\\mspub.exe'\n      - '\\visio.exe'\n    Image|endswith:\n      - '\\powershell.exe'\n      - '\\pwsh.exe'\n  condition: selection\nfalsepositives:\n  - Rare administrative scripts\nlevel: high\nreferences:\n  - https://attack.mitre.org/techniques/T1059/001/\n  - https://www.microsoft.com/en-us/security/blog/2021/01/20/deep-dive-into-the-solorigate-second-stage-activation/",
+  "splunk_spl": "index=endpoint sourcetype=XmlWinEventLog:Microsoft-Windows-Sysmon/Operational EventCode=1\nParentImage IN (\"*\\\\winword.exe\", \"*\\\\excel.exe\", \"*\\\\powerpnt.exe\", \"*\\\\outlook.exe\", \"*\\\\mspub.exe\", \"*\\\\visio.exe\")\nImage IN (\"*\\\\powershell.exe\", \"*\\\\pwsh.exe\")\n| stats count by _time, Computer, User, ParentImage, Image, CommandLine\n| sort - _time",
+  "sentinel_kql": "DeviceProcessEvents\n| where InitiatingProcessFileName in~ ('winword.exe', 'excel.exe', 'powerpnt.exe', 'outlook.exe', 'mspub.exe', 'visio.exe')\n| where FileName in~ ('powershell.exe', 'pwsh.exe')\n| project TimeGenerated, DeviceName, InitiatingProcessFileName, FileName, ProcessCommandLine, InitiatingProcessAccountName",
+  "elastic_query": "{\"query\":{\"bool\":{\"filter\":[{\"terms\":{\"process.parent.name.keyword\":[\"winword.exe\",\"excel.exe\",\"powerpnt.exe\",\"outlook.exe\",\"mspub.exe\",\"visio.exe\"]}},{\"terms\":{\"process.name.keyword\":[\"powershell.exe\",\"pwsh.exe\"]}}]}}}",
+  "detection_logic": "Identify process creation events where the parent process is a known Microsoft Office application (winword.exe, excel.exe, powerpnt.exe, outlook.exe, mspub.exe, visio.exe) and the child process is powershell.exe or pwsh.exe.",
+  "windows_event_ids": [
+    "4688"
+  ],
+  "sysmon_event_ids": [
+    "1"
+  ],
+  "false_positives": [
+    "Rare administrative scripts using Office automation (should be baselined)",
+    "Legitimate software deployment tools using Office plugins (rare)"
+  ],
+  "investigation_checklist": {
+    "immediate_actions": [
+      "Identify the user and host involved.",
+      "Determine the source of the Office document (email, download, etc.).",
+      "Check for persistence mechanisms created by the script."
+    ],
+    "evidence_collection": [
+      "Capture the full command line of the PowerShell process.",
+      "Extract the Office document that triggered the macro.",
+      "Collect memory dumps if the process is still active.",
+      "Review recent network connections from the host."
+    ],
+    "threat_hunting_queries": [
+      "index=endpoint (ParentImage=\"*\\\\winword.exe\" OR ParentImage=\"*\\\\excel.exe\") Image=\"*\\\\powershell.exe\" | stats count by Computer, User, CommandLine"
+    ],
+    "next_investigation_steps": [
+      "Analyze the macro code if the document is available.",
+      "Check for lateral movement attempts from the compromised host.",
+      "Review EDR/AV alerts for the same host."
+    ],
+    "containment": [
+      "Isolate the affected host from the network.",
+      "Terminate the suspicious PowerShell process tree.",
+      "Disable the user account if credential compromise is suspected."
+    ],
+    "recovery": [
+      "Restore the host from a clean backup if necessary.",
+      "Reset user credentials.",
+      "Update security policies to block macros from untrusted sources."
+    ]
+  },
+  "coverage": {
+    "required_logs": [
+      "Microsoft-Windows-Sysmon/Operational",
+      "Security Event Log"
+    ],
+    "required_products": [
+      "Splunk Enterprise Security",
+      "Microsoft Sentinel",
+      "Elastic Security"
+    ],
+    "required_data_sources": [
+      "Endpoint Process Creation"
+    ],
+    "deployment_platforms": [
+      "Windows Workstations",
+      "Windows Servers"
+    ],
+    "recommended_log_retention": "90 days"
+  },
+  "detection_maturity": {
+    "score": 90,
+    "level": "Production Ready",
+    "reason": "High fidelity detection with minimal false positives in standard office environments."
+  },
+  "coverage_summary": {
+    "mitre_tactic": "Execution",
+    "mitre_technique": "Command and Scripting Interpreter: PowerShell",
+    "telemetry_sources": [
+      "Endpoint Process Creation"
+    ],
+    "required_event_ids": [
+      "4688"
+    ],
+    "required_sysmon_events": [
+      "1"
+    ],
+    "recommended_log_sources": [
+      "Sysmon Event ID 1",
+      "Windows Event ID 4688"
+    ]
+  },
+  "related_attack_groups": [
+    "APT28",
+    "FIN7",
+    "TA505"
+  ],
+  "known_malware": [
+    "Emotet",
+    "Qakbot",
+    "TrickBot",
+    "IcedID"
+  ],
+  "common_initial_access": [
+    "Spearphishing Attachment",
+    "Drive-by Compromise"
+  ],
+  "common_persistence": [
+    "Scheduled Task",
+    "Registry Run Keys"
+  ],
+  "references": [
+    "https://attack.mitre.org/techniques/T1059/001/",
+    "https://www.microsoft.com/en-us/security/blog/2021/01/20/deep-dive-into-the-solorigate-second-stage-activation/"
+  ],
+  "qa_review": {
+    "overall_result": "PASS",
+    "mitre_correct": true,
+    "sigma_valid": true,
+    "splunk_valid": true,
+    "sentinel_valid": true,
+    "elastic_valid": true,
+    "confidence_score": 90,
+    "review_notes": "Rule is well-structured and targets a high-risk behavior. Elastic query was updated to be more performant and accurate.",
+    "recommended_changes": [
+      "Updated Elastic query to use .keyword fields for exact matching.",
+      "Added pwsh.exe to Elastic query.",
+      "Updated detection_logic to accurately reflect the query."
+    ]
+  },
+  "use_case": "Detect suspicious PowerShell execution spawning from Microsoft Office applications"
+}
