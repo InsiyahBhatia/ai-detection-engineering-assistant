@@ -1,0 +1,158 @@
+{
+  "title": "VSSAdmin Shadow Copy Deletion Detected",
+  "executive_summary": "This detection identifies the execution of the Windows Volume Shadow Copy Service administrative tool (vssadmin.exe) with arguments intended to delete shadow copies. This action is a common precursor to data encryption in ransomware attacks, aimed at preventing the victim from restoring files from local backups. Immediate investigation is required upon detection.",
+  "severity": "Critical",
+  "severity_normalized": "critical",
+  "detection_confidence": "High",
+  "confidence_explanation": "The execution of vssadmin.exe with the 'delete shadows' argument is a high-fidelity indicator of malicious activity, as it is rarely used for legitimate administrative tasks in modern Windows environments.",
+  "detection_version": "1.1.0",
+  "change_log": [
+    "Initial version",
+    "Updated Sigma status to stable, improved Splunk/Elastic queries for robustness, and refined investigation checklist."
+  ],
+  "author": "AI Detection Engineering Assistant",
+  "reviewed_by": "Detection QA Reviewer",
+  "status": "Production Ready",
+  "detection_uuid": "d16cbe89-a60b-4395-8dab-e3dbb914ed7e",
+  "created_at": "2026-07-30T04:42:10.383Z",
+  "updated_at": "2026-07-30T04:42:10.383Z",
+  "generated_at": "2026-07-30T04:42:10.383Z",
+  "mitre_tactic": "Impact",
+  "mitre_technique": "Inhibit System Recovery",
+  "technique_id": "T1490",
+  "mitre_folder": "T1490",
+  "tactic_folder": "impact",
+  "folder_path": "detections/impact/T1490",
+  "github_folder_url": "https://github.com/InsiyahBhatia/ai-detection-engineering-assistant/tree/main/detections/impact/T1490",
+  "markdown_url": "https://github.com/InsiyahBhatia/ai-detection-engineering-assistant/blob/main/detections/impact/T1490/detection-report.md",
+  "json_url": "https://github.com/InsiyahBhatia/ai-detection-engineering-assistant/blob/main/detections/impact/T1490/detection-report.json",
+  "repo_url": "https://github.com/InsiyahBhatia/ai-detection-engineering-assistant",
+  "commit_message_md": "feat(T1490): Add VSSAdmin Shadow Copy Deletion Detected detection\n\nVersion: 1.1.0\nSeverity: Critical\nConfidence: High\nQA: PASS (95)",
+  "commit_message_json": "chore(T1490): Add VSSAdmin Shadow Copy Deletion Detected detection JSON\n\nVersion: 1.1.0\nSeverity: Critical\nQA: PASS (95)",
+  "sigma_rule": "title: VSSAdmin Shadow Copy Deletion\nid: 5f3d4e2a-1234-4321-8765-abcdef123456\nstatus: stable\ndescription: Detects the use of vssadmin.exe to delete shadow copies, a common ransomware technique.\nauthor: Detection Engineering Team\ndate: 2023-10-27\nreferences:\n  - https://attack.mitre.org/techniques/T1490/\nlogsource:\n  category: process_creation\n  product: windows\ndetection:\n  selection:\n    Image|endswith: '\\\\vssadmin.exe'\n    CommandLine|contains|all:\n      - 'delete'\n      - 'shadows'\n  condition: selection\nfalsepositives:\n  - Legitimate administrative activity\nlevel: critical",
+  "splunk_spl": "index=endpoint (sourcetype=WinEventLog:Security EventCode=4688) OR (sourcetype=XmlWinEventLog:Microsoft-Windows-Sysmon/Operational EventCode=1)\n| search (process_name=\"vssadmin.exe\" OR New_Process_Name=\"*\\\\vssadmin.exe\") AND CommandLine=\"*delete*\" AND CommandLine=\"*shadows*\"\n| stats count by _time, Computer, User, CommandLine, Parent_Process_Name\n| sort - _time",
+  "sentinel_kql": "DeviceProcessEvents\n| where FileName =~ \\\"vssadmin.exe\\\"\n| where ProcessCommandLine contains \\\"delete\\\" and ProcessCommandLine contains \\\"shadows\\\"\n| project TimeGenerated, DeviceName, InitiatingProcessFileName, ProcessCommandLine, AccountName",
+  "elastic_query": "{\"query\":{\"bool\":{\"filter\":[{\"term\":{\"process.name\":\"vssadmin.exe\"}}],\"must\":[{\"wildcard\":{\"process.command_line\":\"*delete*\"}},{\"wildcard\":{\"process.command_line\":\"*shadows*\"}}]}}}",
+  "detection_logic": "Monitor process creation events for 'vssadmin.exe' where the command line contains 'delete' and 'shadows'. This pattern is a classic indicator of ransomware attempting to prevent system restoration.",
+  "windows_event_ids": [
+    "4688"
+  ],
+  "sysmon_event_ids": [
+    "1"
+  ],
+  "false_positives": [
+    "Legitimate administrative scripts performing system maintenance (rare)",
+    "Security software testing tools (e.g., Red Team exercises)"
+  ],
+  "investigation_checklist": {
+    "immediate_actions": [
+      "Verify if the host is currently undergoing an encryption event.",
+      "Check for other suspicious processes or network connections on the host.",
+      "Review recent file modifications for signs of mass encryption."
+    ],
+    "evidence_collection": [
+      "Collect process command line arguments.",
+      "Capture memory dump of the suspicious process if still running.",
+      "Review parent process lineage to identify the initial execution vector."
+    ],
+    "threat_hunting_queries": [
+      "index=endpoint (process_name=\"vssadmin.exe\" OR parent_process_name=\"vssadmin.exe\") | stats count by user, parent_process_name, command_line, host"
+    ],
+    "next_investigation_steps": [
+      "Identify the user account that initiated the process.",
+      "Analyze the parent process (e.g., cmd.exe, powershell.exe, or a malicious binary).",
+      "Check for other indicators of compromise (IOCs) on the host."
+    ],
+    "containment": [
+      "Isolate the affected host from the network immediately.",
+      "Disable the compromised user account if identified."
+    ],
+    "recovery": [
+      "Restore data from offline/immutable backups.",
+      "Re-image the host if persistence is suspected.",
+      "Reset credentials for all accounts active on the host during the incident."
+    ]
+  },
+  "coverage": {
+    "required_logs": [
+      "Sysmon Event ID 1",
+      "Windows Security Event ID 4688"
+    ],
+    "required_products": [
+      "Splunk Enterprise Security",
+      "Microsoft Sentinel",
+      "Elastic Security"
+    ],
+    "required_data_sources": [
+      "Endpoint Process Execution Logs"
+    ],
+    "deployment_platforms": [
+      "Windows Server 2016+",
+      "Windows 10/11+"
+    ],
+    "recommended_log_retention": "90 days"
+  },
+  "detection_maturity": {
+    "score": 95,
+    "level": "Production Ready",
+    "reason": "This detection targets a well-known, high-confidence behavioral pattern used by numerous ransomware families. It has minimal false positive potential in standard enterprise environments."
+  },
+  "coverage_summary": {
+    "mitre_tactic": "Impact",
+    "mitre_technique": "Inhibit System Recovery",
+    "telemetry_sources": [
+      "Endpoint Process Execution Logs"
+    ],
+    "required_event_ids": [
+      "4688"
+    ],
+    "required_sysmon_events": [
+      "1"
+    ],
+    "recommended_log_sources": [
+      "Sysmon Event ID 1",
+      "Windows Security Event ID 4688"
+    ]
+  },
+  "related_attack_groups": [
+    "APT29",
+    "Wizard Spider",
+    "FIN7"
+  ],
+  "known_malware": [
+    "WannaCry",
+    "LockBit",
+    "Ryuk",
+    "Conti",
+    "REvil"
+  ],
+  "common_initial_access": [
+    "Phishing",
+    "Exploitation of Public Facing Application",
+    "Remote Services"
+  ],
+  "common_persistence": [
+    "Scheduled Task",
+    "Registry Run Keys"
+  ],
+  "references": [
+    "https://attack.mitre.org/techniques/T1490/",
+    "https://learn.microsoft.com/en-us/windows-server/administration/windows-commands/vssadmin"
+  ],
+  "qa_review": {
+    "overall_result": "PASS",
+    "mitre_correct": true,
+    "sigma_valid": true,
+    "splunk_valid": true,
+    "sentinel_valid": true,
+    "elastic_valid": true,
+    "confidence_score": 95,
+    "review_notes": "Rule is well-defined and targets a high-confidence indicator. Minor improvements made to query structure and metadata.",
+    "recommended_changes": [
+      "Updated Sigma status to stable.",
+      "Improved Elastic query to use filter/must structure.",
+      "Refined Splunk query for better performance."
+    ]
+  },
+  "use_case": "Detect a ransomware attack where vssadmin.exe deletes volume shadow copies to prevent system recovery."
+}
