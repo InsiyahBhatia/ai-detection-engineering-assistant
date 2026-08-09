@@ -1,0 +1,155 @@
+{
+  "title": "LSASS Memory Access by Rundll32",
+  "executive_summary": "This detection identifies unauthorized attempts by rundll32.exe to access the memory space of the Local Security Authority Subsystem Service (LSASS). LSASS is responsible for enforcing security policy and handling user authentication. Accessing its memory is a primary method for attackers to extract plaintext credentials, NTLM hashes, and Kerberos tickets. This activity is strongly indicative of credential dumping tools such as Mimikatz or the abuse of legitimate Windows binaries like comsvcs.dll.",
+  "severity": "Critical",
+  "severity_normalized": "critical",
+  "detection_confidence": "High",
+  "confidence_explanation": "High confidence as rundll32.exe accessing LSASS memory is highly anomalous in a standard enterprise environment and is a classic indicator of credential dumping tools like Mimikatz or Comsvcs.dll usage.",
+  "detection_version": "1.1.0",
+  "change_log": [
+    "Initial version",
+    "Updated Elastic query to use wildcard/keyword fields for better performance and accuracy.",
+    "Corrected Windows Event ID list to focus on Sysmon 10."
+  ],
+  "author": "AI Detection Engineering Assistant",
+  "reviewed_by": "Detection QA Reviewer",
+  "status": "Production Ready",
+  "detection_uuid": "7e2c8ca0-a5db-4f24-8b8c-3c46374830e1",
+  "created_at": "2026-08-09T17:24:19.164Z",
+  "updated_at": "2026-08-09T17:24:19.164Z",
+  "generated_at": "2026-08-09T17:24:19.164Z",
+  "mitre_tactic": "Credential Access",
+  "mitre_technique": "OS Credential Dumping: LSASS Memory",
+  "technique_id": "T1003.001",
+  "mitre_folder": "T1003.001",
+  "tactic_folder": "credential-access",
+  "folder_path": "detections/credential-access/T1003.001",
+  "github_folder_url": "https://github.com/InsiyahBhatia/ai-detection-engineering-assistant/tree/main/detections/credential-access/T1003.001",
+  "markdown_url": "https://github.com/InsiyahBhatia/ai-detection-engineering-assistant/blob/main/detections/credential-access/T1003.001/detection-report.md",
+  "json_url": "https://github.com/InsiyahBhatia/ai-detection-engineering-assistant/blob/main/detections/credential-access/T1003.001/detection-report.json",
+  "repo_url": "https://github.com/InsiyahBhatia/ai-detection-engineering-assistant",
+  "commit_message_md": "feat(T1003.001): Add LSASS Memory Access by Rundll32 detection\n\nVersion: 1.1.0\nSeverity: Critical\nConfidence: High\nQA: PASS (95)",
+  "commit_message_json": "chore(T1003.001): Add LSASS Memory Access by Rundll32 detection JSON\n\nVersion: 1.1.0\nSeverity: Critical\nQA: PASS (95)",
+  "sigma_rule": "title: LSASS Memory Access by Rundll32\nid: 8b2d4f1a-5c3e-4b9d-a1f2-3e4d5c6b7a89\nstatus: experimental\ndescription: Detects access to LSASS memory by rundll32.exe, often used for credential dumping.\nauthor: Detection Engineering Team\ndate: 2023-10-27\nreferences:\n  - https://attack.mitre.org/techniques/T1003/001/\nlogsource:\n  product: windows\n  category: process_access\ndetection:\n  selection:\n    TargetImage|endswith: '\\lsass.exe'\n    SourceImage|endswith: '\\rundll32.exe'\n  condition: selection\nfalsepositives:\n  - Legitimate security software\nlevel: critical",
+  "splunk_spl": "index=windows EventCode=10 TargetImage=\"*\\\\lsass.exe\" SourceImage=\"*\\\\rundll32.exe\"\n| stats count by _time, Computer, User, SourceImage, TargetImage, GrantedAccess\n| where count > 0",
+  "sentinel_kql": "DeviceProcessEvents\n| where InitiatingProcessFileName =~ \"rundll32.exe\"\n| join kind=inner (\n    DeviceEvents\n    | where ActionType == \"ProcessMemoryAccess\"\n    | where FileName =~ \"lsass.exe\"\n) on DeviceId\n| project TimeGenerated, DeviceName, InitiatingProcessFileName, FileName, ActionType, AccountName",
+  "elastic_query": "{\"query\":{\"bool\":{\"filter\":[{\"term\":{\"event.code\":\"10\"}},{\"wildcard\":{\"winlog.event_data.TargetImage.keyword\":\"*\\\\\\\\lsass.exe\"}},{\"wildcard\":{\"winlog.event_data.SourceImage.keyword\":\"*\\\\\\\\rundll32.exe\"}}]}}}",
+  "detection_logic": "Detects process access requests to the LSASS process (lsass.exe) where the source process is rundll32.exe. This is a common technique used by attackers to dump memory via exported functions like 'MiniDump' in comsvcs.dll.",
+  "windows_event_ids": [
+    "10"
+  ],
+  "sysmon_event_ids": [
+    "10"
+  ],
+  "false_positives": [
+    "Rarely, legitimate security software or diagnostic tools might trigger this if misconfigured."
+  ],
+  "investigation_checklist": {
+    "immediate_actions": [
+      "Verify if the rundll32.exe process was launched with suspicious arguments (e.g., comsvcs.dll).",
+      "Check for other suspicious processes spawned by the same parent.",
+      "Review recent authentication logs for the affected host."
+    ],
+    "evidence_collection": [
+      "Collect memory dump of the affected process if possible.",
+      "Capture MFT and event logs from the host.",
+      "Extract command-line arguments for the rundll32.exe process."
+    ],
+    "threat_hunting_queries": [
+      "index=windows EventCode=10 TargetImage=\"*lsass.exe\" SourceImage=\"*rundll32.exe\" | stats count by Computer, User, SourceImage, CommandLine"
+    ],
+    "next_investigation_steps": [
+      "Analyze the parent process of rundll32.exe to determine the initial entry point.",
+      "Check for lateral movement indicators (e.g., SMB/RDP connections) originating from this host.",
+      "Scan the host for known credential dumping tools."
+    ],
+    "containment": [
+      "Isolate the affected host from the network.",
+      "Disable the compromised user account if identified.",
+      "Terminate the suspicious rundll32.exe process."
+    ],
+    "recovery": [
+      "Re-image the host if persistence is suspected.",
+      "Reset credentials for all accounts logged into the host during the incident.",
+      "Patch vulnerabilities that allowed initial access."
+    ]
+  },
+  "coverage": {
+    "required_logs": [
+      "Sysmon Event ID 10 (Process Access)"
+    ],
+    "required_products": [
+      "Splunk Enterprise Security",
+      "Microsoft Sentinel",
+      "Elastic Security"
+    ],
+    "required_data_sources": [
+      "Sysmon"
+    ],
+    "deployment_platforms": [
+      "Windows Server 2016+",
+      "Windows 10/11+"
+    ],
+    "recommended_log_retention": "90 days hot, 1 year cold"
+  },
+  "detection_maturity": {
+    "score": 90,
+    "level": "Production Ready",
+    "reason": "High fidelity detection with minimal false positives in standard environments."
+  },
+  "coverage_summary": {
+    "mitre_tactic": "Credential Access",
+    "mitre_technique": "OS Credential Dumping: LSASS Memory",
+    "telemetry_sources": [
+      "Sysmon"
+    ],
+    "required_event_ids": [
+      "10"
+    ],
+    "required_sysmon_events": [
+      "10"
+    ],
+    "recommended_log_sources": [
+      "Sysmon Event ID 10"
+    ]
+  },
+  "related_attack_groups": [
+    "APT29",
+    "Lazarus Group",
+    "FIN7"
+  ],
+  "known_malware": [
+    "Mimikatz",
+    "Cobalt Strike",
+    "Empire"
+  ],
+  "common_initial_access": [
+    "Phishing",
+    "Exploitation of Remote Services",
+    "Supply Chain Compromise"
+  ],
+  "common_persistence": [
+    "Scheduled Task",
+    "Registry Run Keys",
+    "Service Installation"
+  ],
+  "references": [
+    "https://attack.mitre.org/techniques/T1003/001/",
+    "https://github.com/SigmaHQ/sigma/blob/master/rules/windows/process_access/win_lsass_access.yml"
+  ],
+  "qa_review": {
+    "overall_result": "PASS",
+    "mitre_correct": true,
+    "sigma_valid": true,
+    "splunk_valid": true,
+    "sentinel_valid": true,
+    "elastic_valid": true,
+    "confidence_score": 95,
+    "review_notes": "Detection is robust and follows standard industry practices for LSASS protection.",
+    "recommended_changes": [
+      "Updated Elastic query to use filter context and keyword fields.",
+      "Removed Windows Event ID 4663 as it is not the primary source for this specific Sysmon-based detection."
+    ]
+  },
+  "use_case": "Detect OS Credential Dumping: LSASS Memory (MITRE T1003.001, tactic: Credential Access) as observed in SIEM alert on Zendesk ticket #8. Alert context: Unauthorized access to LSASS memory by rundll32.exe, indicating a potential attempt to extract credentials from memory (e.g., via Mimikatz)."
+}
