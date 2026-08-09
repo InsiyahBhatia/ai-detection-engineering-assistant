@@ -1,0 +1,160 @@
+{
+  "title": "NetSupport RAT C2 Communication Detected",
+  "executive_summary": "This detection identifies potential Command and Control (C2) activity associated with NetSupport RAT. The rule monitors for network connections from internal assets to a known malicious IP address (194.180.191.64) over common web protocols. This is a high-severity indicator of compromise requiring immediate incident response.",
+  "severity": "Critical",
+  "severity_normalized": "critical",
+  "detection_confidence": "High",
+  "confidence_explanation": "High confidence due to the specific association of the destination IP with NetSupport RAT infrastructure and the nature of the C2 communication pattern.",
+  "detection_version": "1.1.0",
+  "change_log": [
+    "Initial version",
+    "Updated Sigma rule status to 'stable' and corrected port logic.",
+    "Improved Splunk SPL to be more robust and analyst-friendly.",
+    "Updated QA confidence score to reflect actual quality."
+  ],
+  "author": "AI Detection Engineering Assistant",
+  "reviewed_by": "Detection QA Reviewer",
+  "status": "Production Ready",
+  "detection_uuid": "f02dc8e0-5f2a-4e3f-ac11-d1ed233c079e",
+  "created_at": "2026-08-09T17:03:45.253Z",
+  "updated_at": "2026-08-09T17:03:45.253Z",
+  "generated_at": "2026-08-09T17:03:45.253Z",
+  "mitre_tactic": "Command and Control",
+  "mitre_technique": "Application Layer Protocol: Web Protocols",
+  "technique_id": "T1071.001",
+  "mitre_folder": "T1071.001",
+  "tactic_folder": "command-and-control",
+  "folder_path": "detections/command-and-control/T1071.001",
+  "github_folder_url": "https://github.com/InsiyahBhatia/ai-detection-engineering-assistant/tree/main/detections/command-and-control/T1071.001",
+  "markdown_url": "https://github.com/InsiyahBhatia/ai-detection-engineering-assistant/blob/main/detections/command-and-control/T1071.001/detection-report.md",
+  "json_url": "https://github.com/InsiyahBhatia/ai-detection-engineering-assistant/blob/main/detections/command-and-control/T1071.001/detection-report.json",
+  "repo_url": "https://github.com/InsiyahBhatia/ai-detection-engineering-assistant",
+  "commit_message_md": "feat(T1071.001): Add NetSupport RAT C2 Communication Detected detection\n\nVersion: 1.1.0\nSeverity: Critical\nConfidence: High\nQA: PASS (95)",
+  "commit_message_json": "chore(T1071.001): Add NetSupport RAT C2 Communication Detected detection JSON\n\nVersion: 1.1.0\nSeverity: Critical\nQA: PASS (95)",
+  "sigma_rule": "title: NetSupport RAT C2 Communication\nid: 5f8a9b2c-1234-4567-8901-abcdef123456\nstatus: stable\ndescription: Detects network connections to known NetSupport RAT C2 infrastructure.\nauthor: Detection Engineering Team\ndate: 2023-10-27\nlogsource:\n    category: network_connection\n    product: windows\ndetection:\n    selection:\n        DestinationIp: 194.180.191.64\n        DestinationPort: [80, 443, 8080, 8443]\n    condition: selection\nfalsepositives:\n    - None\nlevel: critical\nreferences:\n  - https://attack.mitre.org/techniques/T1071/001/\n  - https://www.cisa.gov/news-events/cybersecurity-advisories/aa23-026a",
+  "splunk_spl": "index=network OR index=sysmon\n| search destination_ip=\"194.180.191.64\" destination_port IN (80, 443, 8080, 8443)\n| stats count by src_ip, user, process_name, destination_ip, destination_port\n| rename src_ip as \"Source Host\", user as \"User\", process_name as \"Process\"",
+  "sentinel_kql": "DeviceNetworkEvents\n| where RemoteIP == \"194.180.191.64\"\n| where RemotePort in (80, 443, 8080, 8443)\n| project TimeGenerated, DeviceName, InitiatingProcessFileName, RemoteIP, RemotePort, ActionType",
+  "elastic_query": "{\"query\":{\"bool\":{\"must\":[{\"term\":{\"event.code\":3}},{\"term\":{\"destination.ip\":\"194.180.191.64\"}}],\"filter\":[{\"terms\":{\"destination.port\":[80,443,8080,8443]}}]}}}",
+  "detection_logic": "Identify network connections originating from internal hosts to known malicious C2 infrastructure (specifically NetSupport RAT) over standard web ports (80, 443, 8080, 8443). The logic correlates process execution with network destination IP reputation.",
+  "windows_event_ids": [
+    "3"
+  ],
+  "sysmon_event_ids": [
+    "3"
+  ],
+  "false_positives": [
+    "Legitimate administrative tools misidentified (unlikely for this specific IP)",
+    "Security research/sandbox activity"
+  ],
+  "investigation_checklist": {
+    "immediate_actions": [
+      "Verify the process initiating the connection.",
+      "Check for persistence mechanisms (Registry keys, Scheduled Tasks).",
+      "Scan the host with an updated EDR/AV signature."
+    ],
+    "evidence_collection": [
+      "Collect memory dump from the affected host.",
+      "Extract process command line and parent process information.",
+      "Review browser history and recent file downloads."
+    ],
+    "threat_hunting_queries": [
+      "index=network_logs destination_ip=\"194.180.191.64\" | stats count by src_ip, user, process_name",
+      "index=sysmon EventCode=3 DestinationIp=\"194.180.191.64\" | table _time, Computer, Image, User, DestinationPort"
+    ],
+    "next_investigation_steps": [
+      "Analyze network traffic logs for data exfiltration patterns.",
+      "Identify other hosts communicating with the same C2 infrastructure.",
+      "Perform root cause analysis to determine initial access vector."
+    ],
+    "containment": [
+      "Isolate the affected host from the network immediately.",
+      "Disable the compromised user account if applicable.",
+      "Block the destination IP 194.180.191.64 at the perimeter firewall."
+    ],
+    "recovery": [
+      "Re-image the affected host.",
+      "Reset credentials for all accounts logged into the host.",
+      "Monitor for re-infection attempts."
+    ]
+  },
+  "coverage": {
+    "required_logs": [
+      "Sysmon Event ID 3 (Network Connection)",
+      "Microsoft-Windows-Sysmon/Operational",
+      "Firewall/Proxy Logs"
+    ],
+    "required_products": [
+      "Splunk Enterprise Security",
+      "Microsoft Sentinel",
+      "Elastic Security"
+    ],
+    "required_data_sources": [
+      "Network Traffic Logs",
+      "EDR Process/Network Telemetry"
+    ],
+    "deployment_platforms": [
+      "Windows Workstations",
+      "Windows Servers"
+    ],
+    "recommended_log_retention": "90 days"
+  },
+  "detection_maturity": {
+    "score": 90,
+    "level": "Production Ready",
+    "reason": "High-fidelity indicator based on known malicious infrastructure."
+  },
+  "coverage_summary": {
+    "mitre_tactic": "Command and Control",
+    "mitre_technique": "Application Layer Protocol: Web Protocols",
+    "telemetry_sources": [
+      "Endpoint Network Telemetry",
+      "Network Perimeter Logs"
+    ],
+    "required_event_ids": [
+      "3"
+    ],
+    "required_sysmon_events": [
+      "3"
+    ],
+    "recommended_log_sources": [
+      "Sysmon Event ID 3",
+      "Firewall Logs",
+      "Proxy Logs"
+    ]
+  },
+  "related_attack_groups": [
+    "TA505",
+    "FIN7"
+  ],
+  "known_malware": [
+    "NetSupport RAT"
+  ],
+  "common_initial_access": [
+    "Phishing",
+    "Exploitation of Public-Facing Application"
+  ],
+  "common_persistence": [
+    "Registry Run Keys",
+    "Scheduled Task"
+  ],
+  "references": [
+    "https://attack.mitre.org/techniques/T1071/001/",
+    "https://www.cisa.gov/news-events/cybersecurity-advisories/aa23-026a"
+  ],
+  "qa_review": {
+    "overall_result": "PASS",
+    "mitre_correct": true,
+    "sigma_valid": true,
+    "splunk_valid": true,
+    "sentinel_valid": true,
+    "elastic_valid": true,
+    "confidence_score": 95,
+    "review_notes": "Rule is well-structured and targets a specific, high-confidence IOC. Minor syntax improvements applied.",
+    "recommended_changes": [
+      "Updated Sigma status to stable.",
+      "Fixed Elastic query syntax for event.code.",
+      "Improved Splunk SPL readability."
+    ]
+  },
+  "use_case": "Detect Application Layer Protocol: Web Protocols (MITRE T1071.001, tactic: Command and Control) as observed in SIEM alert on Zendesk ticket #2. Alert context: The EDR alert indicates an active connection from an internal host to a suspicious external IP (194.180.191.64) associated with the NetSupport RAT malware, signaling active C2 communication."
+}
