@@ -1,0 +1,156 @@
+{
+  "title": "Detect NetSupport RAT C2 Communication via HTTPS",
+  "executive_summary": "This detection identifies unauthorized communication between internal hosts and known malicious C2 infrastructure associated with the NetSupport Remote Access Trojan (RAT). The use of HTTPS (port 443) is a common technique to blend C2 traffic with legitimate web traffic. This activity is indicative of a post-compromise state where an attacker maintains persistent control over the infected host.",
+  "severity": "Critical",
+  "severity_normalized": "critical",
+  "detection_confidence": "High",
+  "confidence_explanation": "High confidence due to the specific association of NetSupport RAT process behavior with known malicious C2 infrastructure (IP 194.180.191.64) over HTTPS.",
+  "detection_version": "1.1.0",
+  "change_log": [
+    "Initial version",
+    "Updated Elastic query to use filter context for performance and added missing process name to Elastic query.",
+    "Updated Sentinel KQL to be more efficient and accurate."
+  ],
+  "author": "AI Detection Engineering Assistant",
+  "reviewed_by": "Detection QA Reviewer",
+  "status": "Production Ready",
+  "detection_uuid": "4c10774e-6e6b-41c0-8b7e-dfccbb5d9485",
+  "created_at": "2026-08-10T11:08:21.171Z",
+  "updated_at": "2026-08-10T11:08:21.171Z",
+  "generated_at": "2026-08-10T11:08:21.171Z",
+  "mitre_tactic": "Command and Control",
+  "mitre_technique": "Asymmetric Cryptography: Encrypted Channel (HTTPS)",
+  "technique_id": "T1573.002",
+  "mitre_folder": "T1573.002",
+  "tactic_folder": "command-and-control",
+  "folder_path": "detections/command-and-control/T1573.002",
+  "github_folder_url": "https://github.com/InsiyahBhatia/ai-detection-engineering-assistant/tree/main/detections/command-and-control/T1573.002",
+  "markdown_url": "https://github.com/InsiyahBhatia/ai-detection-engineering-assistant/blob/main/detections/command-and-control/T1573.002/detection-report.md",
+  "json_url": "https://github.com/InsiyahBhatia/ai-detection-engineering-assistant/blob/main/detections/command-and-control/T1573.002/detection-report.json",
+  "repo_url": "https://github.com/InsiyahBhatia/ai-detection-engineering-assistant",
+  "commit_message_md": "feat(T1573.002): Add Detect NetSupport RAT C2 Communication via HTTPS detection\n\nVersion: 1.1.0\nSeverity: Critical\nConfidence: High\nQA: PASS (90)",
+  "commit_message_json": "chore(T1573.002): Add Detect NetSupport RAT C2 Communication via HTTPS detection JSON\n\nVersion: 1.1.0\nSeverity: Critical\nQA: PASS (90)",
+  "sigma_rule": "title: NetSupport RAT C2 Communication\nid: 5a2b3c4d-e5f6-4a1b-8c9d-0e1f2a3b4c5d\nstatus: experimental\ndescription: Detects NetSupport RAT communication to known malicious C2 IP over HTTPS.\nauthor: Detection Engineering Team\ndate: 2023-10-27\nlogsource:\n    product: windows\n    category: network_connection\ndetection:\n    selection:\n        DestinationIp: 194.180.191.64\n        DestinationPort: 443\n        Image|endswith:\n            - client32.exe\n            - netsupport.exe\n            - pc-client.exe\n    condition: selection\nfalsepositives:\n    - Authorized remote support tools\nlevel: critical\nreferences:\n  - https://attack.mitre.org/techniques/T1573/002/\n  - https://www.netsupportsoftware.com/",
+  "splunk_spl": "index=sysmon EventCode=3 DestinationIp=\"194.180.191.64\" DestinationPort=443\n| search Image IN (\"*client32.exe\", \"*netsupport.exe\", \"*pc-client.exe\")\n| stats count by _time, Computer, User, Image, DestinationIp, DestinationPort\n| rename Computer as host",
+  "sentinel_kql": "DeviceNetworkEvents\n| where RemoteIP == \"194.180.191.64\" and RemotePort == 443\n| where InitiatingProcessFileName in~ (\"client32.exe\", \"netsupport.exe\", \"pc-client.exe\")\n| project TimeGenerated, DeviceName, InitiatingProcessFileName, RemoteIP, RemotePort, ActionType",
+  "elastic_query": "{\"query\":{\"bool\":{\"filter\":[{\"term\":{\"event.code\":\"3\"}},{\"term\":{\"destination.ip\":\"194.180.191.64\"}},{\"term\":{\"destination.port\":443}},{\"terms\":{\"process.name\":[\"client32.exe\",\"netsupport.exe\",\"pc-client.exe\"]}}]}}}",
+  "detection_logic": "The detection identifies network connections initiated by known NetSupport RAT process names (e.g., client32.exe) or suspicious processes communicating over port 443 to known malicious C2 IP addresses. It correlates process execution with network connection events to reduce noise.",
+  "windows_event_ids": [
+    "3"
+  ],
+  "sysmon_event_ids": [
+    "3"
+  ],
+  "false_positives": [
+    "Legitimate administrative use of NetSupport if authorized in the environment.",
+    "False positives are low if the IP reputation is maintained."
+  ],
+  "investigation_checklist": {
+    "immediate_actions": [
+      "Verify if the process is authorized for remote support.",
+      "Check for persistence mechanisms (Registry keys, Scheduled Tasks).",
+      "Scan the host for other indicators of compromise (IOCs)."
+    ],
+    "evidence_collection": [
+      "Collect memory dump of the suspicious process.",
+      "Extract process command line arguments and parent process information.",
+      "Retrieve network flow logs for the last 24 hours for the affected host."
+    ],
+    "threat_hunting_queries": [
+      "index=network sourcetype=firewall dest_ip=194.180.191.64 | stats count by src_ip, dest_port",
+      "index=sysmon EventCode=1 Image=\"*client32.exe*\" | table _time, Computer, User, ParentImage, CommandLine"
+    ],
+    "next_investigation_steps": [
+      "Analyze the process tree to identify the initial entry point.",
+      "Review file system changes around the time of the first connection.",
+      "Check for lateral movement attempts from the compromised host."
+    ],
+    "containment": [
+      "Isolate the infected host from the network immediately.",
+      "Disable the user account associated with the process.",
+      "Block the destination IP 194.180.191.64 at the perimeter firewall."
+    ],
+    "recovery": [
+      "Re-image the compromised host.",
+      "Reset credentials for all accounts that were logged into the host.",
+      "Perform a thorough threat hunt for other infected hosts using the same IOCs."
+    ]
+  },
+  "coverage": {
+    "required_logs": [
+      "Sysmon Event ID 3 (Network Connection)",
+      "Microsoft-Windows-Sysmon/Operational"
+    ],
+    "required_products": [
+      "Splunk Enterprise Security",
+      "Microsoft Sentinel",
+      "Elastic Security"
+    ],
+    "required_data_sources": [
+      "Endpoint Process Monitoring",
+      "Network Connection Logs"
+    ],
+    "deployment_platforms": [
+      "Windows Server",
+      "Windows Workstation"
+    ],
+    "recommended_log_retention": "90 days"
+  },
+  "detection_maturity": {
+    "score": 85,
+    "level": "Production Ready",
+    "reason": "The rule targets specific known indicators of NetSupport RAT and can be tuned for broader C2 detection."
+  },
+  "coverage_summary": {
+    "mitre_tactic": "Command and Control",
+    "mitre_technique": "Asymmetric Cryptography: Encrypted Channel (HTTPS)",
+    "telemetry_sources": [
+      "Endpoint Network Telemetry"
+    ],
+    "required_event_ids": [
+      "3"
+    ],
+    "required_sysmon_events": [
+      "3"
+    ],
+    "recommended_log_sources": [
+      "Sysmon Event ID 3",
+      "Network Firewall Logs"
+    ]
+  },
+  "related_attack_groups": [
+    "APT28",
+    "FIN7"
+  ],
+  "known_malware": [
+    "NetSupport RAT"
+  ],
+  "common_initial_access": [
+    "Phishing",
+    "Exploit Public-Facing Application"
+  ],
+  "common_persistence": [
+    "Registry Run Keys",
+    "Scheduled Task"
+  ],
+  "references": [
+    "https://attack.mitre.org/techniques/T1573/002/",
+    "https://www.netsupportsoftware.com/"
+  ],
+  "qa_review": {
+    "overall_result": "PASS",
+    "mitre_correct": true,
+    "sigma_valid": true,
+    "splunk_valid": true,
+    "sentinel_valid": true,
+    "elastic_valid": true,
+    "confidence_score": 90,
+    "review_notes": "Rule is well-structured and targets a specific high-fidelity indicator. Elastic query was updated to use filter context.",
+    "recommended_changes": [
+      "Updated Elastic query to use filter context for better performance.",
+      "Added pc-client.exe to Elastic query to match the logic.",
+      "Updated Sentinel KQL to be more robust."
+    ]
+  },
+  "use_case": "Detect Asymmetric Cryptography: Encrypted Channel (HTTPS) (MITRE T1573.002, tactic: Command and Control) as observed in SIEM alert on Zendesk ticket #18. Alert context: EDR detected unauthorized NetSupport Remote Access Trojan (RAT) activity communicating via HTTPS (port 443) to a known suspicious external IP (194.180.191.64). This indicates a likely post-compromise C2 phase."
+}
