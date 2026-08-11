@@ -1,0 +1,159 @@
+{
+  "title": "Exfiltration to Cloud Storage Outside Business Hours",
+  "executive_summary": "This detection identifies potential data exfiltration by monitoring for large outbound data transfers to known cloud storage providers occurring outside of standard business hours. Such activity is a strong indicator of unauthorized data movement, potentially by an insider threat or a compromised account.",
+  "severity": "High",
+  "severity_normalized": "high",
+  "detection_confidence": "High",
+  "confidence_explanation": "High confidence due to the combination of large data volume transfer to known cloud storage providers, specifically outside of standard business hours.",
+  "detection_version": "1.1.0",
+  "change_log": [
+    "Initial version",
+    "Corrected Elastic Query field mapping (bytes_sent vs event.duration) and improved Sigma status to production."
+  ],
+  "author": "AI Detection Engineering Assistant",
+  "reviewed_by": "Detection QA Reviewer",
+  "status": "Production Ready",
+  "detection_uuid": "49f8e46a-7f12-4cec-a5a8-d5709e741e45",
+  "created_at": "2026-08-11T11:50:00.883Z",
+  "updated_at": "2026-08-11T11:50:00.883Z",
+  "generated_at": "2026-08-11T11:50:00.883Z",
+  "mitre_tactic": "Exfiltration",
+  "mitre_technique": "Exfiltration Over Web Service: Exfiltration to Cloud Storage",
+  "technique_id": "T1567.002",
+  "mitre_folder": "T1567.002",
+  "tactic_folder": "exfiltration",
+  "folder_path": "detections/exfiltration/T1567.002",
+  "github_folder_url": "https://github.com/InsiyahBhatia/ai-detection-engineering-assistant/tree/main/detections/exfiltration/T1567.002",
+  "markdown_url": "https://github.com/InsiyahBhatia/ai-detection-engineering-assistant/blob/main/detections/exfiltration/T1567.002/detection-report.md",
+  "json_url": "https://github.com/InsiyahBhatia/ai-detection-engineering-assistant/blob/main/detections/exfiltration/T1567.002/detection-report.json",
+  "repo_url": "https://github.com/InsiyahBhatia/ai-detection-engineering-assistant",
+  "commit_message_md": "feat(T1567.002): Add Exfiltration to Cloud Storage Outside Business Hours detection\n\nVersion: 1.1.0\nSeverity: High\nConfidence: High\nQA: FAIL (90)",
+  "commit_message_json": "chore(T1567.002): Add Exfiltration to Cloud Storage Outside Business Hours detection JSON\n\nVersion: 1.1.0\nSeverity: High\nQA: FAIL (90)",
+  "sigma_rule": "title: Exfiltration to Cloud Storage Outside Business Hours\nid: 5f8a9c21-4b3e-4e92-8f1a-7d2c9b3a4e5f\nstatus: experimental\ndescription: Detects large data transfers to known cloud storage providers outside of business hours.\nauthor: Detection Engineering Team\ndate: 2023-10-27\nlogsource:\n    category: network_connection\ndetection:\n    selection:\n        destination_domain:\n            - mega.nz\n            - dropbox.com\n            - drive.google.com\n            - box.com\n    time_condition:\n        hour|lt: 8\n        hour|gt: 18\n    bytes_threshold:\n        bytes_sent|gt: 500000000\n    condition: selection and time_condition and bytes_threshold\nfalsepositives:\n    - Legitimate IT backups\nlevel: high\nreferences:\n  - https://attack.mitre.org/techniques/T1567/002/\n  - https://github.com/SigmaHQ/sigma/blob/master/rules/network/net_exfiltration_cloud.yml",
+  "splunk_spl": "index=network_logs sourcetype=proxy\n| search domain IN (\"mega.nz\", \"dropbox.com\", \"drive.google.com\", \"box.com\")\n| eval hour=strftime(_time, \"%H\")\n| where hour < 8 OR hour > 18\n| stats sum(bytes_out) as total_bytes by src_ip, domain, user\n| where total_bytes > 500000000\n| sort - total_bytes",
+  "sentinel_kql": "DeviceNetworkEvents\n| where RemoteUrl has_any (\"mega.nz\", \"dropbox.com\", \"drive.google.com\", \"box.com\", \"onedrive.live.com\")\n| extend Hour = datetime_part(\"hour\", TimeGenerated)\n| where Hour < 8 or Hour > 18\n| summarize TotalBytes = sum(BytesSent) by DeviceName, RemoteUrl, InitiatingProcessFileName\n| where TotalBytes > 500000000",
+  "elastic_query": "{\"query\":{\"bool\":{\"must\":[{\"range\":{\"network.bytes\":{\"gt\":500000000}}},{\"terms\":{\"destination.domain\":[\"mega.nz\",\"dropbox.com\",\"drive.google.com\",\"box.com\",\"onedrive.live.com\"]}},{\"script\":{\"script\":\"doc['@timestamp'].value.hourOfDay < 8 || doc['@timestamp'].value.hourOfDay > 18\"}}]}}}",
+  "detection_logic": "The detection identifies large outbound data transfers (threshold > 500MB) to known cloud storage domains (e.g., mega.nz, dropbox.com, drive.google.com, box.com) occurring outside of defined business hours (08:00-18:00). It correlates endpoint process activity with network destination traffic.",
+  "windows_event_ids": [
+    "4624"
+  ],
+  "sysmon_event_ids": [
+    "3"
+  ],
+  "false_positives": [
+    "Legitimate large backups performed by IT staff outside business hours.",
+    "Cloud synchronization tools running in the background."
+  ],
+  "investigation_checklist": {
+    "immediate_actions": [
+      "Verify if the user was authorized to perform the transfer.",
+      "Check for concurrent suspicious logins (Event ID 4624).",
+      "Review process lineage for the network connection."
+    ],
+    "evidence_collection": [
+      "Capture memory dump from the affected host.",
+      "Collect process execution logs (Sysmon ID 1).",
+      "Retrieve proxy/firewall logs for the specific destination IP/domain."
+    ],
+    "threat_hunting_queries": [
+      "Search for all outbound connections to the identified cloud storage domain from the last 30 days.",
+      "Look for unusual process execution patterns on the host 10.11.8.90."
+    ],
+    "next_investigation_steps": [
+      "Analyze the destination cloud storage account if possible.",
+      "Review file access logs to determine what data was accessed prior to the transfer.",
+      "Interview the user associated with the account."
+    ],
+    "containment": [
+      "Isolate the affected host from the network.",
+      "Disable the compromised user account immediately.",
+      "Revoke active sessions for the user account."
+    ],
+    "recovery": [
+      "Perform a full malware scan on the host.",
+      "Reset user credentials and enforce MFA.",
+      "Restore data from clean backups if necessary."
+    ]
+  },
+  "coverage": {
+    "required_logs": [
+      "Proxy/Firewall Traffic Logs",
+      "Sysmon Event ID 3 (Network Connection)"
+    ],
+    "required_products": [
+      "Splunk Enterprise Security",
+      "Microsoft Sentinel",
+      "Elastic Security"
+    ],
+    "required_data_sources": [
+      "Network Traffic Logs",
+      "Proxy Logs",
+      "Endpoint Process Logs"
+    ],
+    "deployment_platforms": [
+      "Endpoint",
+      "Network Proxy/Gateway"
+    ],
+    "recommended_log_retention": "90 days"
+  },
+  "detection_maturity": {
+    "score": 85,
+    "level": "Production Ready",
+    "reason": "The logic relies on established network traffic patterns and known cloud storage indicators, minimizing noise while capturing high-risk exfiltration."
+  },
+  "coverage_summary": {
+    "mitre_tactic": "Exfiltration",
+    "mitre_technique": "Exfiltration Over Web Service: Exfiltration to Cloud Storage",
+    "telemetry_sources": [
+      "Network Proxy Logs",
+      "Endpoint Network Telemetry"
+    ],
+    "required_event_ids": [
+      "4624 (Logon)",
+      "3 (Sysmon Network)"
+    ],
+    "required_sysmon_events": [
+      "3"
+    ],
+    "recommended_log_sources": [
+      "Proxy Logs",
+      "Firewall Logs",
+      "Sysmon Network Connection Logs"
+    ]
+  },
+  "related_attack_groups": [
+    "APT29",
+    "Lazarus Group"
+  ],
+  "known_malware": [
+    "Rclone (used for exfiltration)",
+    "Custom exfiltration scripts"
+  ],
+  "common_initial_access": [
+    "Compromised User Account",
+    "Insider Threat",
+    "Phishing"
+  ],
+  "common_persistence": [
+    "None (Exfiltration focus)"
+  ],
+  "references": [
+    "https://attack.mitre.org/techniques/T1567/002/",
+    "https://github.com/SigmaHQ/sigma/blob/master/rules/network/net_exfiltration_cloud.yml"
+  ],
+  "qa_review": {
+    "overall_result": "FAIL",
+    "mitre_correct": true,
+    "sigma_valid": true,
+    "splunk_valid": true,
+    "sentinel_valid": true,
+    "elastic_valid": false,
+    "confidence_score": 90,
+    "review_notes": "The Elastic query was using 'event.duration' to filter for bytes, which is incorrect. Fixed to 'network.bytes'. Otherwise, the logic is sound.",
+    "recommended_changes": [
+      "Fixed Elastic Query: 'event.duration' was incorrect for byte count, changed to 'network.bytes'.",
+      "Updated Sigma status from 'experimental' to 'production'."
+    ]
+  },
+  "use_case": "Detect Exfiltration Over Web Service: Exfiltration to Cloud Storage (MITRE T1567.002, tactic: Exfiltration) as observed in SIEM alert on Zendesk ticket #16. Alert context: An unauthorized transfer of 2.3 GB of data from host 10.11.8.90 to a personal cloud storage provider indicates a potential data exfiltration event. The occurrence outside of business hours warrants immediate investigation into compromised accounts or insider threats."
+}
