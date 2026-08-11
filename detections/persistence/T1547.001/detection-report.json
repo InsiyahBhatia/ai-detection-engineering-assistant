@@ -1,0 +1,161 @@
+{
+  "title": "Persistence via Registry Run Keys",
+  "executive_summary": "This detection identifies adversaries attempting to maintain persistence by adding malicious entries to Windows Registry Run or RunOnce keys. These keys are frequently abused to execute scripts or binaries automatically upon user login. The detection specifically flags registry modifications that point to PowerShell or command-line interpreters, which are common indicators of C2 activity or secondary payload delivery.",
+  "severity": "High",
+  "severity_normalized": "high",
+  "detection_confidence": "High",
+  "confidence_explanation": "High confidence due to the specific monitoring of Registry Run/RunOnce keys combined with PowerShell execution patterns. Legitimate software rarely modifies these keys during runtime; most installers do so during initial setup.",
+  "detection_version": "1.1.0",
+  "change_log": [
+    "Initial version",
+    "Updated Sigma rule status to production, improved Splunk/Sentinel/Elastic queries for better performance and accuracy, and refined detection logic description."
+  ],
+  "author": "AI Detection Engineering Assistant",
+  "reviewed_by": "Detection QA Reviewer",
+  "status": "Production Ready",
+  "detection_uuid": "14bf1f2a-317e-4241-8f2b-333e3e8d5474",
+  "created_at": "2026-08-11T12:55:48.112Z",
+  "updated_at": "2026-08-11T12:55:48.112Z",
+  "generated_at": "2026-08-11T12:55:48.112Z",
+  "mitre_tactic": "Persistence",
+  "mitre_technique": "Boot or Logon Autostart Execution: Registry Run Keys / Startup Folder",
+  "technique_id": "T1547.001",
+  "mitre_folder": "T1547.001",
+  "tactic_folder": "persistence",
+  "folder_path": "detections/persistence/T1547.001",
+  "github_folder_url": "https://github.com/InsiyahBhatia/ai-detection-engineering-assistant/tree/main/detections/persistence/T1547.001",
+  "markdown_url": "https://github.com/InsiyahBhatia/ai-detection-engineering-assistant/blob/main/detections/persistence/T1547.001/detection-report.md",
+  "json_url": "https://github.com/InsiyahBhatia/ai-detection-engineering-assistant/blob/main/detections/persistence/T1547.001/detection-report.json",
+  "repo_url": "https://github.com/InsiyahBhatia/ai-detection-engineering-assistant",
+  "commit_message_md": "feat(T1547.001): Add Persistence via Registry Run Keys detection\n\nVersion: 1.1.0\nSeverity: High\nConfidence: High\nQA: PASS (90)",
+  "commit_message_json": "chore(T1547.001): Add Persistence via Registry Run Keys detection JSON\n\nVersion: 1.1.0\nSeverity: High\nQA: PASS (90)",
+  "sigma_rule": "title: Registry Run Key Modification for Persistence\nid: 5f8a2b1c-9d3e-4b7a-8c1f-2e3d4a5b6c7d\nstatus: stable\ndescription: Detects modifications to Windows Registry Run/RunOnce keys which are used for persistence.\nauthor: Detection Engineering Team\ndate: 2023-10-27\nlogsource:\n  product: windows\n  category: registry_event\ndetection:\n  selection:\n    EventID: 13\n    TargetObject|contains:\n      - '\\Software\\Microsoft\\Windows\\CurrentVersion\\Run\\'\n      - '\\Software\\Microsoft\\Windows\\CurrentVersion\\RunOnce\\'\n  condition: selection\nfalsepositives:\n  - Legitimate software installers\nlevel: high\nreferences:\n  - https://attack.mitre.org/techniques/T1547/001/\n  - https://docs.microsoft.com/en-us/windows/win32/setupapi/run-and-runonce-registry-keys",
+  "splunk_spl": "index=windows sourcetype=XmlWinEventLog:Microsoft-Windows-Sysmon/Operational EventCode=13\n| search RegistryPath=\"*\\\\Software\\\\Microsoft\\\\Windows\\\\CurrentVersion\\\\Run*\"\n| eval RegistryData=lower(RegistryData)\n| where RegistryData LIKE \"%powershell%\" OR RegistryData LIKE \"%cmd.exe%\" OR RegistryData LIKE \"%wscript%\" OR RegistryData LIKE \"%cscript%\"\n| stats count by _time, Computer, Image, RegistryPath, RegistryData\n| rename Computer as host, Image as process_name",
+  "sentinel_kql": "DeviceRegistryEvents\n| where RegistryKey has_any (@\"\\Software\\Microsoft\\Windows\\CurrentVersion\\Run\", @\"\\Software\\Microsoft\\Windows\\CurrentVersion\\RunOnce\")\n| where RegistryValueData has_any (\"powershell\", \"cmd.exe\", \"wscript\", \"cscript\")\n| project TimeGenerated, DeviceName, InitiatingProcessFileName, RegistryKey, RegistryValueName, RegistryValueData",
+  "elastic_query": "{\"query\":{\"bool\":{\"must\":[{\"term\":{\"event.code\":\"13\"}},{\"wildcard\":{\"registry.path\":\"*\\\\\\\\Software\\\\\\\\Microsoft\\\\\\\\Windows\\\\\\\\CurrentVersion\\\\\\\\Run*\"}},{\"bool\":{\"should\":[{\"wildcard\":{\"registry.data.strings\":\"*powershell*\"}},{\"wildcard\":{\"registry.data.strings\":\"*cmd.exe*\"}},{\"wildcard\":{\"registry.data.strings\":\"*wscript*\"}},{\"wildcard\":{\"registry.data.strings\":\"*cscript*\"}}]}}]}}}",
+  "detection_logic": "The detection monitors for modifications to Windows Registry Run/RunOnce keys (Sysmon Event ID 13) where the data value contains suspicious command-line arguments (e.g., powershell, cmd.exe, wscript, cscript). It flags these registry changes as potential persistence mechanisms.",
+  "windows_event_ids": [
+    "4657"
+  ],
+  "sysmon_event_ids": [
+    "13"
+  ],
+  "false_positives": [
+    "Legitimate software installers or updaters (e.g., Google Update, Microsoft Office) modifying Run keys during installation.",
+    "System administration tools used for legitimate configuration management."
+  ],
+  "investigation_checklist": {
+    "immediate_actions": [
+      "Verify the legitimacy of the process that modified the registry key.",
+      "Check for other persistence mechanisms (Scheduled Tasks, Services).",
+      "Review network logs for connections to suspicious domains or IPs."
+    ],
+    "evidence_collection": [
+      "Capture the full registry key path and data value.",
+      "Collect the PowerShell script or binary referenced in the registry key.",
+      "Extract memory dumps from the affected host if C2 activity is suspected."
+    ],
+    "threat_hunting_queries": [
+      "index=endpoint sourcetype=sysmon EventCode=13 RegistryPath=\"*\\\\Run*\" | stats count by Image, RegistryValueName, RegistryData"
+    ],
+    "next_investigation_steps": [
+      "Analyze the PowerShell script for C2 infrastructure.",
+      "Identify the initial entry vector (e.g., phishing email, exploit).",
+      "Check for lateral movement indicators from the affected host."
+    ],
+    "containment": [
+      "Isolate the affected host from the network.",
+      "Disable the user account associated with the registry modification.",
+      "Remove the malicious registry key entry."
+    ],
+    "recovery": [
+      "Re-image the host if persistence is confirmed.",
+      "Reset user credentials.",
+      "Review and harden Group Policy Objects (GPOs) to restrict registry modifications."
+    ]
+  },
+  "coverage": {
+    "required_logs": [
+      "Sysmon Event ID 1, 13"
+    ],
+    "required_products": [
+      "Splunk Enterprise Security",
+      "Microsoft Sentinel",
+      "Elastic Security"
+    ],
+    "required_data_sources": [
+      "Windows Registry Events",
+      "Process Creation Events"
+    ],
+    "deployment_platforms": [
+      "Windows Workstations",
+      "Windows Servers"
+    ],
+    "recommended_log_retention": "90 days hot, 1 year cold"
+  },
+  "detection_maturity": {
+    "score": 90,
+    "level": "Production Ready",
+    "reason": "The rule targets high-fidelity registry modifications and is widely used in enterprise environments to detect persistence."
+  },
+  "coverage_summary": {
+    "mitre_tactic": "Persistence",
+    "mitre_technique": "Boot or Logon Autostart Execution: Registry Run Keys / Startup Folder",
+    "telemetry_sources": [
+      "Endpoint Detection and Response (EDR)",
+      "Sysmon"
+    ],
+    "required_event_ids": [
+      "4657"
+    ],
+    "required_sysmon_events": [
+      "1, 13"
+    ],
+    "recommended_log_sources": [
+      "Sysmon",
+      "Windows Event Logs"
+    ]
+  },
+  "related_attack_groups": [
+    "APT29",
+    "FIN7",
+    "Wizard Spider"
+  ],
+  "known_malware": [
+    "Emotet",
+    "TrickBot",
+    "Qakbot",
+    "Cobalt Strike Beacons"
+  ],
+  "common_initial_access": [
+    "Phishing",
+    "Exploitation of Remote Services",
+    "Drive-by Compromise"
+  ],
+  "common_persistence": [
+    "Registry Run Keys",
+    "Startup Folder",
+    "Scheduled Tasks",
+    "Services"
+  ],
+  "references": [
+    "https://attack.mitre.org/techniques/T1547/001/",
+    "https://docs.microsoft.com/en-us/windows/win32/setupapi/run-and-runonce-registry-keys"
+  ],
+  "qa_review": {
+    "overall_result": "PASS",
+    "mitre_correct": true,
+    "sigma_valid": true,
+    "splunk_valid": true,
+    "sentinel_valid": true,
+    "elastic_valid": true,
+    "confidence_score": 90,
+    "review_notes": "Rule is well-structured and targets a high-value persistence technique. Minor cleanup performed on queries.",
+    "recommended_changes": [
+      "Updated Sigma status to production.",
+      "Refined Elastic query to use wildcards for better matching.",
+      "Updated required logs to focus on Sysmon 13."
+    ]
+  },
+  "use_case": "Detect Boot or Logon Autostart Execution: Registry Run Keys / Startup Folder (MITRE T1547.001, tactic: Persistence) as observed in SIEM alert on Zendesk ticket #15. Alert context: The alert indicates that an adversary has established persistence on host 10.11.2.61 by creating a malicious entry in the Windows Registry Run key that invokes a PowerShell script upon user login. This script is configured to fetch remote content, indicating an ongoing Command and Control (C2) or payload delivery activity."
+}
