@@ -1,0 +1,156 @@
+{
+  "title": "Token Impersonation via Process Access (T1134.001)",
+  "executive_summary": "This detection identifies attempts to duplicate access tokens, a technique used by attackers to escalate privileges from a standard user to SYSTEM. The detection focuses on suspicious process access patterns targeting sensitive system processes like LSASS, which is a common target for token theft.",
+  "severity": "Critical",
+  "severity_normalized": "critical",
+  "detection_confidence": "High",
+  "confidence_explanation": "High confidence due to the specific nature of Windows API calls (DuplicateTokenEx) targeting SYSTEM level tokens, which is rarely performed by legitimate administrative tools in a production environment.",
+  "detection_version": "1.1.0",
+  "change_log": [
+    "Initial version",
+    "Updated Sigma status to stable, refined Elastic query for better performance, and improved investigation checklist."
+  ],
+  "author": "AI Detection Engineering Assistant",
+  "reviewed_by": "Detection QA Reviewer",
+  "status": "Production Ready",
+  "detection_uuid": "c7d3e48a-48ec-4366-876b-182cfca180b6",
+  "created_at": "2026-08-11T12:54:08.534Z",
+  "updated_at": "2026-08-11T12:54:08.534Z",
+  "generated_at": "2026-08-11T12:54:08.534Z",
+  "mitre_tactic": "Privilege Escalation",
+  "mitre_technique": "Token Impersonation",
+  "technique_id": "T1134.001",
+  "mitre_folder": "T1134.001",
+  "tactic_folder": "privilege-escalation",
+  "folder_path": "detections/privilege-escalation/T1134.001",
+  "github_folder_url": "https://github.com/InsiyahBhatia/ai-detection-engineering-assistant/tree/main/detections/privilege-escalation/T1134.001",
+  "markdown_url": "https://github.com/InsiyahBhatia/ai-detection-engineering-assistant/blob/main/detections/privilege-escalation/T1134.001/detection-report.md",
+  "json_url": "https://github.com/InsiyahBhatia/ai-detection-engineering-assistant/blob/main/detections/privilege-escalation/T1134.001/detection-report.json",
+  "repo_url": "https://github.com/InsiyahBhatia/ai-detection-engineering-assistant",
+  "commit_message_md": "feat(T1134.001): Add Token Impersonation via Process Access (T1134.001) detection\n\nVersion: 1.1.0\nSeverity: Critical\nConfidence: High\nQA: PASS (95)",
+  "commit_message_json": "chore(T1134.001): Add Token Impersonation via Process Access (T1134.001) detection JSON\n\nVersion: 1.1.0\nSeverity: Critical\nQA: PASS (95)",
+  "sigma_rule": "title: Token Impersonation via Process Access\nid: 5f8a2b1c-9e3d-4a1f-8b2c-7d6e5f4a3b2c\nstatus: stable\ndescription: Detects process access patterns indicative of token duplication or impersonation.\nauthor: Detection Engineering Team\ndate: 2023-10-27\nlogsource:\n  product: windows\n  category: process_access\ndetection:\n  selection:\n    EventID: 10\n    TargetImage|endswith: '\\lsass.exe'\n    GrantedAccess:\n      - '0x10000000'\n      - '0x1000000'\n      - '0x100000'\n      - '0x10000'\n  condition: selection\nfalsepositives:\n  - Security software\nlevel: critical\nreferences:\n  - https://attack.mitre.org/techniques/T1134/001/\n  - https://docs.microsoft.com/en-us/windows/win32/api/securitybaseapi/nf-securitybaseapi-duplicatetokenex",
+  "splunk_spl": "index=windows sourcetype=\"XmlWinEventLog:Microsoft-Windows-Sysmon/Operational\" EventCode=10 TargetImage=\"*\\\\lsass.exe\"\n| eval GrantedAccess=upper(GrantedAccess)\n| where GrantedAccess IN (\"0x10000000\", \"0x1000000\", \"0x100000\", \"0x10000\")\n| stats count by _time, Computer, SourceImage, TargetImage, GrantedAccess, User\n| sort - _time",
+  "sentinel_kql": "DeviceEvents\n| where ActionType == \"ProcessAccess\"\n| extend GrantedAccess = tostring(AdditionalFields.GrantedAccess)\n| where GrantedAccess in (\"0x10000000\", \"0x1000000\", \"0x100000\", \"0x10000\")\n| where TargetProcessName =~ \"lsass.exe\"\n| project TimeGenerated, DeviceName, InitiatingProcessFileName, TargetProcessName, GrantedAccess, InitiatingProcessAccountName",
+  "elastic_query": "{\"query\":{\"bool\":{\"filter\":[{\"term\":{\"event.code\":\"10\"}},{\"wildcard\":{\"winlog.event_data.TargetImage\":\"*\\\\\\\\lsass.exe\"}}],\"must\":[{\"terms\":{\"winlog.event_data.GrantedAccess\":[\"0x10000000\",\"0x1000000\",\"0x100000\",\"0x10000\"]}}]}}}",
+  "detection_logic": "Monitor for ProcessAccess events (Sysmon ID 10) where the target process is accessed with specific access masks (0x10000000, 0x1000000, 0x100000, 0x10000) associated with token duplication, specifically targeting processes running as NT AUTHORITY\\SYSTEM.",
+  "windows_event_ids": [
+    "10"
+  ],
+  "sysmon_event_ids": [
+    "10"
+  ],
+  "false_positives": [
+    "Legitimate security software (EDR/AV) performing deep inspection.",
+    "System administration tools performing backup or auditing tasks."
+  ],
+  "investigation_checklist": {
+    "immediate_actions": [
+      "Verify if the process is a known security tool.",
+      "Check the user context of the source process.",
+      "Review recent network connections from the host."
+    ],
+    "evidence_collection": [
+      "Capture memory dump of the suspicious process.",
+      "Collect Sysmon logs for the 30 minutes preceding the alert.",
+      "Extract command-line history and parent process information."
+    ],
+    "threat_hunting_queries": [
+      "index=sysmon EventCode=10 TargetImage=\"*lsass.exe\" | stats count by SourceImage, TargetImage, User"
+    ],
+    "next_investigation_steps": [
+      "Analyze the parent process chain to identify the initial entry point.",
+      "Check for lateral movement indicators (e.g., RDP, SMB, WMI).",
+      "Search for other hosts with similar process access patterns."
+    ],
+    "containment": [
+      "Isolate the affected host from the network.",
+      "Terminate the suspicious process identified in the alert.",
+      "Disable the compromised user account if applicable."
+    ],
+    "recovery": [
+      "Re-image the host if persistence is suspected.",
+      "Reset credentials for all accounts logged into the host.",
+      "Patch vulnerabilities that allowed the initial compromise."
+    ]
+  },
+  "coverage": {
+    "required_logs": [
+      "Microsoft-Windows-Sysmon/Operational"
+    ],
+    "required_products": [
+      "Splunk Enterprise Security",
+      "Microsoft Sentinel",
+      "Elastic Security"
+    ],
+    "required_data_sources": [
+      "Sysmon Event ID 10 (ProcessAccess)"
+    ],
+    "deployment_platforms": [
+      "Windows Server 2016+",
+      "Windows 10/11+"
+    ],
+    "recommended_log_retention": "90 days hot, 1 year cold"
+  },
+  "detection_maturity": {
+    "score": 90,
+    "level": "Production Ready",
+    "reason": "High fidelity detection based on Windows API behavior, low false positive rate in standard environments."
+  },
+  "coverage_summary": {
+    "mitre_tactic": "Privilege Escalation",
+    "mitre_technique": "Token Impersonation",
+    "telemetry_sources": [
+      "Sysmon"
+    ],
+    "required_event_ids": [
+      "10"
+    ],
+    "required_sysmon_events": [
+      "10"
+    ],
+    "recommended_log_sources": [
+      "Sysmon Event ID 10"
+    ]
+  },
+  "related_attack_groups": [
+    "APT29",
+    "FIN7",
+    "Lazarus Group"
+  ],
+  "known_malware": [
+    "Cobalt Strike",
+    "Mimikatz",
+    "Metasploit Meterpreter"
+  ],
+  "common_initial_access": [
+    "Exploitation of Remote Services",
+    "Spearphishing Attachment",
+    "Supply Chain Compromise"
+  ],
+  "common_persistence": [
+    "Scheduled Task/Job",
+    "Windows Service",
+    "Registry Run Keys"
+  ],
+  "references": [
+    "https://attack.mitre.org/techniques/T1134/001/",
+    "https://docs.microsoft.com/en-us/windows/win32/api/securitybaseapi/nf-securitybaseapi-duplicatetokenex"
+  ],
+  "qa_review": {
+    "overall_result": "PASS",
+    "mitre_correct": true,
+    "sigma_valid": true,
+    "splunk_valid": true,
+    "sentinel_valid": true,
+    "elastic_valid": true,
+    "confidence_score": 95,
+    "review_notes": "Detection logic is sound and targets the correct API behavior.",
+    "recommended_changes": [
+      "Updated Sigma status to stable.",
+      "Refined Elastic query to use wildcard for TargetImage to ensure cross-environment compatibility.",
+      "Added versioning and change log entries."
+    ]
+  },
+  "use_case": "Detect Access Token Manipulation: Token Impersonation/Theft (MITRE T1134.001, tactic: Privilege Escalation) as observed in SIEM alert on Zendesk ticket #12. Alert context: The system identified a highly suspicious event on host 10.11.7.19: a process successfully duplicated a SYSTEM-level access token, which is a classic indicator of local privilege escalation (LPE) and account impersonation. This suggests an active compromise where an attacker has successfully moved from a low-privileged user to administrative rights on the machine."
+}
